@@ -305,6 +305,86 @@ func signinURL() (string, error) {
 	return fmt.Sprintf(signinURLStr, url.PathEscape(h), encKey), nil
 }
 
+// KVSlotRequest is the body for /api/experimental/kv/save and .../restore.
+//
+// The runner's slot index is intentionally not exposed: this feature targets
+// single-slot (OLLAMA_NUM_PARALLEL=1) runners and the runner picks the slot
+// internally. Options, if set, must match the options used for inference on
+// this model — otherwise scheduling may load a different runner and the saved
+// KV would not correspond to it.
+type KVSlotRequest struct {
+	Model     string         `json:"model"`
+	Filename  string         `json:"filename"`
+	KeepAlive *api.Duration  `json:"keep_alive,omitempty"`
+	Options   map[string]any `json:"options,omitempty"`
+}
+
+// KVSlotHandler proxies llama-server's per-slot KV save/restore to the
+// currently loaded runner. This is the Ollama-side surface of the fork's
+// prefill-cache persistence: persist the KV of a fixed system prompt once,
+// then restore it before each request to collapse TTFT. Requires
+// OLLAMA_SLOT_SAVE_PATH (which makes the runner launch llama-server with
+// --slot-save-path). action is "save" or "restore".
+func (s *Server) KVSlotHandler(action string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if envconfig.SlotSavePath() == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "KV slot persistence disabled; set OLLAMA_SLOT_SAVE_PATH and restart ollama"})
+			return
+		}
+
+		var req KVSlotRequest
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		if req.Model == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "model is required"})
+			return
+		}
+		if req.Filename == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "filename is required"})
+			return
+		}
+		// Constrain the filename to a basename so it cannot escape the
+		// OLLAMA_SLOT_SAVE_PATH directory llama-server resolves it against.
+		if strings.ContainsAny(req.Filename, "/\\:\x00") || req.Filename == "." || req.Filename == ".." {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "filename must be a basename (no path separators)"})
+			return
+		}
+		// Ensure the model is loaded and obtain its runner.
+		runner, _, _, err := s.scheduleRunner(c.Request.Context(), req.Model, "", []model.Capability{model.CapabilityCompletion}, req.Options, req.KeepAlive, nil)
+		if err != nil {
+			handleScheduleError(c, req.Model, err)
+			return
+		}
+
+		// Slot save/restore is an optional runner capability (only llama-server
+		// runners launched with --slot-save-path implement it).
+		saver, ok := runner.(llm.SlotKVSaver)
+		if !ok {
+			c.JSON(http.StatusNotImplemented, gin.H{"error": "the active runner does not support slot KV save/restore"})
+			return
+		}
+
+		var res *llm.SlotKVResult
+		if action == "save" {
+			res, err = saver.SaveSlot(c.Request.Context(), req.Filename)
+		} else {
+			res, err = saver.RestoreSlot(c.Request.Context(), req.Filename)
+		}
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		contentType := res.ContentType
+		if contentType == "" {
+			contentType = "application/json"
+		}
+		c.Data(res.Status, contentType, res.Body)
+	}
+}
+
 func (s *Server) GenerateHandler(c *gin.Context) {
 	checkpointStart := time.Now()
 	var req api.GenerateRequest
@@ -2428,6 +2508,12 @@ func (s *Server) GenerateRoutes() (http.Handler, error) {
 	r.POST("/api/chat", s.withInferenceRequestLogging("/api/chat", s.ChatHandler)...)
 	r.POST("/api/embed", s.EmbedHandler)
 	r.POST("/api/embeddings", s.EmbeddingsHandler)
+
+	// KV slot persistence (fork): save/restore a model's prefill cache to disk.
+	// Experimental and disabled unless OLLAMA_SLOT_SAVE_PATH is set.
+	r.POST("/api/experimental/kv/save", s.KVSlotHandler("save"))
+	r.POST("/api/experimental/kv/restore", s.KVSlotHandler("restore"))
+
 	r.POST("/v1/systemone", cloudPassthroughMiddleware(cloudErrRemoteInferenceUnavailable), s.SystemOneHandler)
 
 	// Inference (OpenAI compatibility)
