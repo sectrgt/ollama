@@ -514,6 +514,27 @@ func startLlamaServer(launch llamaServerLaunchConfig, out io.Writer) (cmd *exec.
 	// /api/experimental/kv/{save,restore}).
 	if dir := envconfig.SlotSavePath(); dir != "" {
 		params = append(params, "--slot-save-path", dir)
+
+		// Cap retained cache files (0 = unlimited, the llama-server default).
+		if n := envconfig.SlotSaveMaxCount(); n > 0 {
+			params = append(params, "--slot-save-max-count", strconv.Itoa(int(n)))
+		}
+
+		// Cap total cache size in MB (0 = unlimited).
+		if mb := envconfig.SlotSaveMaxMB(); mb > 0 {
+			params = append(params, "--slot-save-max-mb", strconv.FormatUint(mb, 10))
+		}
+	}
+
+	// Opt-in MoE expert offload (fork): when OLLAMA_CPU_MOE is true, offload
+	// all MoE expert weights to system RAM. When OLLAMA_N_CPU_MOE is set,
+	// offload only the first N layers' MoE experts. These free VRAM while
+	// keeping attention, embeddings, and KV cache on GPU. Only meaningful for
+	// Mixture-of-Experts models; ignored by llama-server for dense models.
+	if envconfig.CpuMoe() {
+		params = append(params, "--cpu-moe")
+	} else if n := envconfig.NCpuMoe(); n > 0 {
+		params = append(params, "--n-cpu-moe", strconv.Itoa(int(n)))
 	}
 
 	// Set up library paths for GPU backend discovery

@@ -256,6 +256,21 @@ var (
 	// /api/experimental/kv/{save,restore} routes. Opt-in: empty means the
 	// feature stays disabled.
 	SlotSavePath = String("OLLAMA_SLOT_SAVE_PATH")
+	// SlotSaveMaxCount, when set, is passed to llama-server as
+	// --slot-save-max-count. Caps the number of cache files retained.
+	// 0 means unlimited (llama-server default).
+	SlotSaveMaxCount = Uint("OLLAMA_SLOT_SAVE_MAX_COUNT", 0)
+	// SlotSaveMaxMB, when set, is passed to llama-server as --slot-save-max-mb.
+	// Caps total cache file size in megabytes. 0 means unlimited.
+	SlotSaveMaxMB = Uint64("OLLAMA_SLOT_SAVE_MAX_MB", 0)
+	// NCpuMoe, when set, is passed to llama-server as --n-cpu-moe N.
+	// Offloads the MoE expert weights of the first N layers to system RAM,
+	// freeing VRAM while keeping attention, embeddings, and KV cache on GPU.
+	// 0 means disabled (no offload).
+	NCpuMoe = Uint("OLLAMA_N_CPU_MOE", 0)
+	// CpuMoe, when true, is passed to llama-server as --cpu-moe.
+	// Offloads ALL MoE expert weights to system RAM.
+	CpuMoe = Bool("OLLAMA_CPU_MOE")
 
 	CudaVisibleDevices    = String("CUDA_VISIBLE_DEVICES")
 	HipVisibleDevices     = String("HIP_VISIBLE_DEVICES")
@@ -341,6 +356,10 @@ func AsMap() map[string]EnvVar {
 		"OLLAMA_NOPRUNE":              {"OLLAMA_NOPRUNE", NoPrune(), "Do not prune model blobs on startup"},
 		"OLLAMA_NUM_PARALLEL":         {"OLLAMA_NUM_PARALLEL", NumParallel(), "Maximum number of parallel requests"},
 		"OLLAMA_SLOT_SAVE_PATH":       {"OLLAMA_SLOT_SAVE_PATH", SlotSavePath(), "Directory for llama-server slot KV save/restore; enables /api/experimental/kv/{save,restore}. Files are large (tens of MB each) and never auto-removed; enable on a trusted local host only (experimental)"},
+		"OLLAMA_SLOT_SAVE_MAX_COUNT":  {"OLLAMA_SLOT_SAVE_MAX_COUNT", SlotSaveMaxCount(), "Maximum number of slot cache files to retain (0 = unlimited)"},
+		"OLLAMA_SLOT_SAVE_MAX_MB":     {"OLLAMA_SLOT_SAVE_MAX_MB", SlotSaveMaxMB(), "Maximum total slot cache size in MB (0 = unlimited)"},
+		"OLLAMA_N_CPU_MOE":            {"OLLAMA_N_CPU_MOE", NCpuMoe(), "Offload MoE expert weights of the first N layers to system RAM (0 = disabled)"},
+		"OLLAMA_CPU_MOE":              {"OLLAMA_CPU_MOE", CpuMoe(), "Offload all MoE expert weights to system RAM"},
 		"OLLAMA_ORIGINS":              {"OLLAMA_ORIGINS", AllowedOrigins(), "A comma separated list of allowed origins"},
 		"OLLAMA_SCHED_SPREAD":         {"OLLAMA_SCHED_SPREAD", SchedSpread(), "Always schedule model across all GPUs"},
 		"OLLAMA_CONTEXT_LENGTH":       {"OLLAMA_CONTEXT_LENGTH", ContextLength(), "Context length to use unless otherwise specified (default: 4k/32k/256k based on VRAM)"},
