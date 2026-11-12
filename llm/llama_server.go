@@ -524,6 +524,18 @@ func startLlamaServer(launch llamaServerLaunchConfig, out io.Writer) (cmd *exec.
 		if mb := envconfig.SlotSaveMaxMB(); mb > 0 {
 			params = append(params, "--slot-save-max-mb", strconv.FormatUint(mb, 10))
 		}
+
+		// Auto disk cache: automatically save/restore KV to disk across
+		// requests without requiring explicit API calls. This enables
+		// transparent prompt prefix reuse even across restarts.
+		if envconfig.SlotSaveAuto() {
+			params = append(params, "--slot-save-auto")
+		}
+
+		// Block size for auto disk cache index hashing (0 = llama-server default of 256).
+		if b := envconfig.SlotSaveBlock(); b > 0 {
+			params = append(params, "--slot-save-block", strconv.Itoa(int(b)))
+		}
 	}
 
 	// Opt-in MoE expert offload (fork): when OLLAMA_CPU_MOE is true, offload

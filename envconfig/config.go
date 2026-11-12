@@ -271,6 +271,14 @@ var (
 	// CpuMoe, when true, is passed to llama-server as --cpu-moe.
 	// Offloads ALL MoE expert weights to system RAM.
 	CpuMoe = Bool("OLLAMA_CPU_MOE")
+	// SlotSaveAuto, when true, is passed to llama-server as --slot-save-auto.
+	// Enables automatic KV cache save/restore to disk across requests
+	// without requiring explicit API calls. Requires SlotSavePath to be set.
+	SlotSaveAuto = Bool("OLLAMA_SLOT_SAVE_AUTO")
+	// SlotSaveBlock, when set, is passed to llama-server as --slot-save-block N.
+	// Sets the token-ID hash block size for the auto disk cache index.
+	// Default is 256 (llama-server default).
+	SlotSaveBlock = Uint("OLLAMA_SLOT_SAVE_BLOCK", 0)
 
 	CudaVisibleDevices    = String("CUDA_VISIBLE_DEVICES")
 	HipVisibleDevices     = String("HIP_VISIBLE_DEVICES")
@@ -360,6 +368,8 @@ func AsMap() map[string]EnvVar {
 		"OLLAMA_SLOT_SAVE_MAX_MB":     {"OLLAMA_SLOT_SAVE_MAX_MB", SlotSaveMaxMB(), "Maximum total slot cache size in MB (0 = unlimited)"},
 		"OLLAMA_N_CPU_MOE":            {"OLLAMA_N_CPU_MOE", NCpuMoe(), "Offload MoE expert weights of the first N layers to system RAM (0 = disabled)"},
 		"OLLAMA_CPU_MOE":              {"OLLAMA_CPU_MOE", CpuMoe(), "Offload all MoE expert weights to system RAM"},
+		"OLLAMA_SLOT_SAVE_AUTO":       {"OLLAMA_SLOT_SAVE_AUTO", SlotSaveAuto(), "Enable automatic KV cache save/restore to disk across requests (requires OLLAMA_SLOT_SAVE_PATH)"},
+		"OLLAMA_SLOT_SAVE_BLOCK":      {"OLLAMA_SLOT_SAVE_BLOCK", SlotSaveBlock(), "Token-ID hash block size for auto disk cache index (0 = llama-server default of 256)"},
 		"OLLAMA_ORIGINS":              {"OLLAMA_ORIGINS", AllowedOrigins(), "A comma separated list of allowed origins"},
 		"OLLAMA_SCHED_SPREAD":         {"OLLAMA_SCHED_SPREAD", SchedSpread(), "Always schedule model across all GPUs"},
 		"OLLAMA_CONTEXT_LENGTH":       {"OLLAMA_CONTEXT_LENGTH", ContextLength(), "Context length to use unless otherwise specified (default: 4k/32k/256k based on VRAM)"},
