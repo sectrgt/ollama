@@ -536,6 +536,13 @@ func startLlamaServer(launch llamaServerLaunchConfig, out io.Writer) (cmd *exec.
 		if b := envconfig.SlotSaveBlock(); b > 0 {
 			params = append(params, "--slot-save-block", strconv.Itoa(int(b)))
 		}
+
+		// Flush interval: minimum seconds between automatic disk flushes.
+		// -555 is our sentinel for "not set" — only pass through if the user
+		// explicitly configured it. 0 = every completion, -1 = disabled.
+		if fi := envconfig.SlotSaveFlushInterval(); fi != -555 {
+			params = append(params, "--slot-save-flush-interval", strconv.Itoa(fi))
+		}
 	}
 
 	// Opt-in MoE expert offload (fork): when OLLAMA_CPU_MOE is true, offload
