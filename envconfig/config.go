@@ -307,6 +307,20 @@ func Uint(key string, defaultValue uint) func() uint {
 	}
 }
 
+func Int(key string, defaultValue int) func() int {
+	return func() int {
+		if s := Var(key); s != "" {
+			if n, err := strconv.ParseInt(s, 10, 64); err != nil {
+				slog.Warn("invalid environment variable, using default", "key", key, "value", s, "default", defaultValue)
+			} else {
+				return int(n)
+			}
+		}
+
+		return defaultValue
+	}
+}
+
 var (
 	// NumParallel sets the number of parallel model requests. NumParallel can be configured via the OLLAMA_NUM_PARALLEL environment variable.
 	NumParallel = Uint("OLLAMA_NUM_PARALLEL", 1)
