@@ -1023,7 +1023,7 @@ func NewLlamaServerRunner(
 		"gemma3":          true,
 		"gemma4":          true,
 		"qwen35":          true,
-		"qwen35moe":       true,
+		"qwen35moe":       false, // qwen35moe with embedded vision tensors crashes the CLIP loader when no separate projector blob exists
 		"qwen25vl":        true,
 		"qwen3vl":         true,
 		"qwen3vlmoe":      true,
